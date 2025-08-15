@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -26,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 // URL API
-                URL url = new URL("https://reqres.in/health");
+                URL url = new URL("https://reqres.in/api/users");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
 
@@ -39,20 +40,39 @@ public class MainActivity extends AppCompatActivity {
                 }
                 reader.close();
 
-                // Parsing JSON
-                JSONObject jsonObject = new JSONObject(result.toString());
 
-                // Tampilkan di UI thread
+
+//                 Parsing JSON array object
+                JSONObject json = new JSONObject(result.toString());
+
+
+
+//                Tampilkan di UI thread
                 runOnUiThread(() -> {
                     try {
-                        String output = String.format(
-                                "Status: %s\nTimestamp: %s\nVersion: %s\nEnvironment: %s",
-                                jsonObject.optString("status"),
-                                jsonObject.optString("timestamp"),
-                                jsonObject.optString("version"),
-                                jsonObject.optString("environment")
-                        );
-                        textResult.setText(output);
+//                      AMBIL ARRAY DATA
+                        JSONArray usersArray = json.getJSONArray("data");
+
+                        StringBuilder output = new StringBuilder();
+                        output.append("List Users:\n\n");
+
+//                        LOOP DATA
+                        for (int i = 0; i < usersArray.length(); i++) {
+                            JSONObject userObj = usersArray.getJSONObject(i);
+
+//                            DATA YANG TERTAMPIL
+                            int id = userObj.getInt("id");
+                            String email = userObj.getString("email");
+                            String first_name = userObj.getString("first_name");
+                            String last_name = userObj.getString("last_name");
+
+//                            UI YANG TERTAMPIL
+                            output.append(String.format(
+                                    "ID: %d\nName: %s %s\nEmail: %s\n\n",
+                                    id, first_name,last_name,email
+                            ));
+                        }
+                        textResult.setText(output.toString());
                     } catch (Exception e) {
                         textResult.setText("Error parsing: " + e.getMessage());
                     }
