@@ -10,21 +10,115 @@
         android:layout_height="wrap_content"
         android:text="Sync Data" />
 
-    <Button
-        android:id="@+id/btnShow"
+    <!-- Progress Indicator Container -->
+    <LinearLayout
+        android:id="@+id/progressContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Show Data"
-        android:layout_marginTop="8dp"/>
+        android:orientation="vertical"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:visibility="gone">
 
-    <TextView
-        android:id="@+id/textResult"
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminate="true" />
+
+        <TextView
+            android:id="@+id/progressText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Syncing data..."
+            android:layout_marginTop="8dp"
+            android:textSize="14sp"
+            android:textColor="@android:color/darker_gray" />
+
+    </LinearLayout>
+
+    <!-- Dropdown Container -->
+    <LinearLayout
+        android:id="@+id/dropdownContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dp"
-        android:text="Result will be shown here"
-        android:scrollbars="vertical"
-        android:gravity="start"
-        android:textSize="14sp" />
+        android:orientation="vertical"
+        android:layout_marginTop="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📍 Pilih Lokasi TPH"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Kode Blok Spinner -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Kode Blok:"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/spinnerKodeBlok"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp"
+            android:background="@android:drawable/btn_dropdown" />
+
+        <!-- No TPH Spinner -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No TPH:"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/spinnerTPH"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp"
+            android:background="@android:drawable/btn_dropdown"
+            android:enabled="false" />
+
+        <Button
+            android:id="@+id/btnShowLocation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Location Details"
+            android:enabled="false" />
+
+    </LinearLayout>
+
+    <!-- Show All Data Button -->
+    <Button
+        android:id="@+id/btnShowAll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Show All Data"
+        android:layout_marginTop="8dp"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp">
+
+        <TextView
+            android:id="@+id/textResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:text="Silakan klik 'Sync Data' untuk memuat data"
+            android:gravity="start"
+            android:textSize="14sp"
+            android:background="@android:drawable/edit_text" />
+
+    </ScrollView>
 
 </LinearLayout>
