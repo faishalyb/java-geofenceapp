@@ -29,6 +29,20 @@ android {
 }
 
 dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.8.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // OpenStreetMap - FREE Alternative to Google Maps
+    implementation 'org.osmdroid:osmdroid-android:6.1.16'
+
+    // For location services (still free)
+    implementation 'androidx.core:core:1.9.0'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     implementation 'com.squareup.okhttp3:okhttp:4.11.0'
     implementation libs.appcompat
     implementation libs.material

@@ -85,12 +85,89 @@
             android:background="@android:drawable/btn_dropdown"
             android:enabled="false" />
 
-        <Button
-            android:id="@+id/btnShowLocation"
+        <!-- Action Buttons -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Show Location Details"
-            android:enabled="false" />
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnShowOnMap"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Show on Map"
+                android:enabled="false"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/btnCheckGeofence"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Check Location"
+                android:enabled="false" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Geofence Status Card -->
+    <LinearLayout
+        android:id="@+id/geofenceStatusCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        android:padding="12dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/textGeofenceStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🎯 Geofence Status"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/textDistanceInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Distance: Calculating..."
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Map Container with OpenStreetMap -->
+    <LinearLayout
+        android:id="@+id/mapContainer"
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:orientation="vertical"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🗺️ TPH Location Map (OpenStreetMap)"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:padding="8dp"
+            android:background="@android:color/darker_gray"
+            android:textColor="@android:color/white" />
+
+        <!-- OpenStreetMap MapView -->
+        <org.osmdroid.views.MapView
+            android:id="@+id/osmMapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="true" />
 
     </LinearLayout>
 
