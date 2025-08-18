@@ -3,7 +3,7 @@ package com.example.geofenceapp;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-//import androidx.preference.PreferenceManager;
+import androidx.preference.PreferenceManager;
 
 import android.Manifest;
 import android.content.Context;
@@ -66,7 +66,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     private Marker tphMarker;
     private Polygon geofenceCircle;
 
-    private static final String API_URL = "https://my-proxy-api-six.vercel.app/api/data";
+    private static final String API_URL = "http://10.100.1.26:3005/api/TPH/GetItemByCompanyLocation?Company=A06&Location=21";
     private static final int PERMISSION_REQUEST_CODE = 1001;
     private static final double GEOFENCE_RADIUS = 20.0; // 20 meters
 
@@ -74,9 +74,21 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Initialize osmdroid configuration
+        // IMPORTANT: Initialize osmdroid configuration BEFORE setContentView
         Context ctx = getApplicationContext();
-//        Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx));
+
+        // Configure osmdroid properly
+        Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx));
+
+        // Set user agent - CRITICAL for OSM tile loading
+        Configuration.getInstance().setUserAgentValue(getPackageName());
+
+        // Enable debug mode to see what's happening
+        Configuration.getInstance().setDebugMode(true);
+
+        // Set cache path
+        Configuration.getInstance().setOsmdroidBasePath(ctx.getExternalFilesDir(null));
+        Configuration.getInstance().setOsmdroidTileCache(ctx.getExternalFilesDir("tiles"));
 
         setContentView(R.layout.activity_main);
 
@@ -119,21 +131,38 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     }
 
     private void setupOpenStreetMap() {
-        // Set tile source (you can change this to different map styles)
-        osmMapView.setTileSource(TileSourceFactory.MAPNIK);
-        osmMapView.setMultiTouchControls(true);
-        osmMapView.setBuiltInZoomControls(true);
+        try {
+            // Set tile source - try MAPNIK first, fallback to others if needed
+            osmMapView.setTileSource(TileSourceFactory.MAPNIK);
 
-        // Set default view (Indonesia coordinates)
-        IMapController mapController = osmMapView.getController();
-        mapController.setZoom(15.0);
-        GeoPoint startPoint = new GeoPoint(-6.200000, 106.816666); // Jakarta as default
-        mapController.setCenter(startPoint);
+            // Enable multi-touch and zoom controls
+            osmMapView.setMultiTouchControls(true);
+            osmMapView.setBuiltInZoomControls(true);
 
-        // Add location overlay for current position
-        myLocationOverlay = new MyLocationNewOverlay(new GpsMyLocationProvider(this), osmMapView);
-        myLocationOverlay.enableMyLocation();
-        osmMapView.getOverlays().add(myLocationOverlay);
+            // Enable hardware acceleration for better performance
+            osmMapView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
+            // Set default view (Indonesia coordinates)
+            IMapController mapController = osmMapView.getController();
+            mapController.setZoom(15.0);
+            GeoPoint startPoint = new GeoPoint(-6.200000, 106.816666); // Jakarta as default
+            mapController.setCenter(startPoint);
+
+            // Add location overlay for current position
+            myLocationOverlay = new MyLocationNewOverlay(new GpsMyLocationProvider(this), osmMapView);
+            myLocationOverlay.enableMyLocation();
+            myLocationOverlay.enableFollowLocation();
+            osmMapView.getOverlays().add(myLocationOverlay);
+
+            // Force refresh
+            osmMapView.invalidate();
+
+            Log.d("OSM", "OpenStreetMap setup completed successfully");
+
+        } catch (Exception e) {
+            Log.e("OSM", "Error setting up OpenStreetMap", e);
+            Toast.makeText(this, "Error setting up map: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void setupSpinners() {
@@ -195,6 +224,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     }
 
     private void checkPermissionsAndSetupUI() {
+        // Check for location permissions
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
@@ -203,6 +233,13 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     PERMISSION_REQUEST_CODE);
         } else {
             startLocationUpdates();
+        }
+
+        // Also check for storage permissions for OSM caching
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    PERMISSION_REQUEST_CODE + 1);
         }
 
         checkDataAndSetupUI();
@@ -278,58 +315,66 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     }
 
     private void showLocationOnMap(GeoPoint location, String kodeBlok, String tph, String company) {
-        // Clear previous markers and overlays
-        if (tphMarker != null) {
-            osmMapView.getOverlays().remove(tphMarker);
-        }
-        if (geofenceCircle != null) {
-            osmMapView.getOverlays().remove(geofenceCircle);
-        }
-
-        // Add TPH marker
-        tphMarker = new Marker(osmMapView);
-        tphMarker.setPosition(location);
-        tphMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-        tphMarker.setTitle("TPH " + kodeBlok + "/" + tph);
-        tphMarker.setSubDescription("Company: " + company);
-
-        // Set marker icon (you can customize this)
         try {
-            Drawable icon = ContextCompat.getDrawable(this, android.R.drawable.ic_menu_mylocation);
-            if (icon != null) {
-                icon.setTint(ContextCompat.getColor(this, android.R.color.holo_red_dark));
-                tphMarker.setIcon(icon);
+            // Clear previous markers and overlays
+            if (tphMarker != null) {
+                osmMapView.getOverlays().remove(tphMarker);
             }
+            if (geofenceCircle != null) {
+                osmMapView.getOverlays().remove(geofenceCircle);
+            }
+
+            // Add TPH marker
+            tphMarker = new Marker(osmMapView);
+            tphMarker.setPosition(location);
+            tphMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+            tphMarker.setTitle("TPH " + kodeBlok + "/" + tph);
+            tphMarker.setSubDescription("Company: " + company);
+
+            // Set marker icon (you can customize this)
+            try {
+                Drawable icon = ContextCompat.getDrawable(this, android.R.drawable.ic_menu_mylocation);
+                if (icon != null) {
+                    icon.setTint(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                    tphMarker.setIcon(icon);
+                }
+            } catch (Exception e) {
+                Log.e("MAP", "Error setting marker icon", e);
+            }
+
+            osmMapView.getOverlays().add(tphMarker);
+
+            // Create geofence circle (approximated as polygon)
+            geofenceCircle = new Polygon();
+            geofenceCircle.setPoints(createCirclePoints(location, GEOFENCE_RADIUS));
+            geofenceCircle.setFillColor(0x220000FF);
+            geofenceCircle.setStrokeColor(0x880000FF);
+            geofenceCircle.setStrokeWidth(3.0f);
+            osmMapView.getOverlays().add(geofenceCircle);
+
+            // Move camera to location
+            IMapController mapController = osmMapView.getController();
+            mapController.setZoom(18.0);
+            mapController.setCenter(location);
+
+            // Show map container
+            mapContainer.setVisibility(View.VISIBLE);
+
+            // Force refresh map
+            osmMapView.invalidate();
+
+            Log.d("MAP", "Location shown on map: " + location.getLatitude() + ", " + location.getLongitude());
+
+            textResult.setText("🗺️ Lokasi TPH ditampilkan di peta\n" +
+                    "📍 " + kodeBlok + "/" + tph + "\n" +
+                    "🎯 Radius geofence: " + GEOFENCE_RADIUS + " meter\n" +
+//                    "🆓 Menggunakan OpenStreetMap (Gratis!)\n\n" +
+                    "Klik 'Check Location' untuk validasi posisi Anda.");
+
         } catch (Exception e) {
-            Log.e("MAP", "Error setting marker icon", e);
+            Log.e("MAP", "Error showing location on map", e);
+            Toast.makeText(this, "Error showing location: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-
-        osmMapView.getOverlays().add(tphMarker);
-
-        // Create geofence circle (approximated as polygon)
-        geofenceCircle = new Polygon();
-        geofenceCircle.setPoints(createCirclePoints(location, GEOFENCE_RADIUS));
-        geofenceCircle.setFillColor(0x220000FF);
-        geofenceCircle.setStrokeColor(0x880000FF);
-        geofenceCircle.setStrokeWidth(3.0f);
-        osmMapView.getOverlays().add(geofenceCircle);
-
-        // Move camera to location
-        IMapController mapController = osmMapView.getController();
-        mapController.setZoom(18.0);
-        mapController.setCenter(location);
-
-        // Show map container
-        mapContainer.setVisibility(View.VISIBLE);
-
-        // Refresh map
-        osmMapView.invalidate();
-
-        textResult.setText("🗺️ Lokasi TPH ditampilkan di peta\n" +
-                "📍 " + kodeBlok + "/" + tph + "\n" +
-                "🎯 Radius geofence: " + GEOFENCE_RADIUS + " meter\n" +
-                "🆓 Menggunakan OpenStreetMap (Gratis!)\n\n" +
-                "Klik 'Check Location' untuk validasi posisi Anda.");
     }
 
     // Create circle points for polygon (approximating circle)
@@ -373,23 +418,23 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         if (isWithinRange) {
             textGeofenceStatus.setText("✅ DALAM AREA GEOFENCE");
             textGeofenceStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-            textDistanceInfo.setText(String.format("📏 Jarak: %.1f meter (Dalam radius %.0f meter)",
+            textDistanceInfo.setText(String.format("📍 Jarak: %.1f meter (Dalam radius %.0f meter)",
                     distance, GEOFENCE_RADIUS));
         } else {
             textGeofenceStatus.setText("❌ DILUAR AREA GEOFENCE");
             textGeofenceStatus.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
-            textDistanceInfo.setText(String.format("📏 Jarak: %.1f meter (Diluar radius %.0f meter)",
+            textDistanceInfo.setText(String.format("📍 Jarak: %.1f meter (Diluar radius %.0f meter)",
                     distance, GEOFENCE_RADIUS));
         }
 
         // Update result text
         String status = isWithinRange ? "✅ VALID - Dalam area" : "❌ INVALID - Diluar area";
         textResult.setText("🎯 HASIL VALIDASI GEOFENCE\n" +
-                "═══════════════════════\n\n" +
+                "══════════════════════════\n\n" +
                 "Status: " + status + "\n" +
                 "Jarak dari TPH: " + String.format("%.1f meter", distance) + "\n" +
                 "Radius geofence: " + GEOFENCE_RADIUS + " meter\n" +
-                "Map: OpenStreetMap (FREE) 🆓\n" +
+//                "Map: OpenStreetMap (FREE) 🆓\n" +
                 "Waktu validasi: " + new java.util.Date().toString());
     }
 
@@ -400,7 +445,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         boolean isWithinRange = distance <= GEOFENCE_RADIUS;
 
         if (geofenceStatusCard.getVisibility() == View.VISIBLE) {
-            textDistanceInfo.setText(String.format("📏 Jarak: %.1f meter %s",
+            textDistanceInfo.setText(String.format("📍 Jarak: %.1f meter %s",
                     distance,
                     isWithinRange ? "(Dalam area)" : "(Diluar area)"));
         }
@@ -419,7 +464,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         tphLocation = null;
     }
 
-    // Previous methods (syncData, loadKodeBlokData, etc.) remain the same
+    // Rest of your existing methods remain the same...
     private void syncData() {
         showProgress(true);
         setButtonsEnabled(false);
@@ -477,8 +522,8 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     setButtonsEnabled(true);
                     loadKodeBlokData();
                     textResult.setText("✅ Sync berhasil!\nTotal data: " + totalRecords + " records\n" +
-                            "📍 Pilih Kode Blok dan TPH untuk melihat lokasi di peta.\n" +
-                            "🆓 Menggunakan OpenStreetMap - GRATIS!");
+                            "📍 Pilih Kode Blok dan TPH untuk melihat lokasi di peta.\n" );
+//                            "🆓 Menggunakan OpenStreetMap - GRATIS!");
                 });
 
             } catch (Exception e) {
@@ -497,7 +542,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
             dropdownContainer.setVisibility(View.VISIBLE);
             btnShowAll.setVisibility(View.VISIBLE);
             loadKodeBlokData();
-            textResult.setText("📍 Data tersedia!\nPilih Kode Blok dan TPH untuk melihat lokasi di peta.\n🆓 Free OpenStreetMap!");
+            textResult.setText("📍 Data tersedia!\nPilih Kode Blok dan TPH untuk melihat lokasi di peta.");
         } else {
             dropdownContainer.setVisibility(View.GONE);
             btnShowAll.setVisibility(View.GONE);
@@ -623,7 +668,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-//        osmMapView.onDestroy();
+        osmMapView.onDetach();
         if (locationManager != null) {
             locationManager.removeUpdates(this);
         }

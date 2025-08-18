@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- File: res/xml/network_security_config.xml -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Allow HTTP traffic for OSM tile servers -->
+        <domain includeSubdomains="true">tile.openstreetmap.org</domain>
+        <domain includeSubdomains="true">a.tile.openstreetmap.org</domain>
+        <domain includeSubdomains="true">b.tile.openstreetmap.org</domain>
+        <domain includeSubdomains="true">c.tile.openstreetmap.org</domain>
+        <!-- Allow your local API server -->
+        <domain includeSubdomains="true">10.100.1.26</domain>
+    </domain-config>
+</network-security-config>
