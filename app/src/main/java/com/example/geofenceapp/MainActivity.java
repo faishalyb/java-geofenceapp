@@ -3,13 +3,10 @@ package com.example.geofenceapp;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.preference.PreferenceManager;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -27,16 +24,6 @@ import android.widget.Toast;
 
 import com.example.geofenceapp.service.DatabaseHelper;
 
-import org.osmdroid.api.IMapController;
-import org.osmdroid.config.Configuration;
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
-import org.osmdroid.util.GeoPoint;
-import org.osmdroid.views.MapView;
-import org.osmdroid.views.overlay.Marker;
-import org.osmdroid.views.overlay.Polygon;
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -48,12 +35,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements LocationListener {
-    private Button btnSync, btnShowAll, btnShowOnMap, btnCheckGeofence;
-    private TextView textResult, progressText, textGeofenceStatus, textDistanceInfo;
-    private LinearLayout progressContainer, dropdownContainer, geofenceStatusCard, mapContainer;
+    private Button btnSync, btnShowAll, btnCheckGeofence;
+    private TextView progressText, textGeofenceStatus, textDistanceInfo, textLocationInfo;
+    private LinearLayout progressContainer, dropdownContainer, geofenceStatusCard;
     private ProgressBar progressBar;
     private Spinner spinnerKodeBlok, spinnerTPH;
-    private MapView osmMapView;
     private DatabaseHelper dbHelper;
 
     private ArrayAdapter<String> kodeBlokAdapter, tphAdapter;
@@ -61,35 +47,17 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
 
     private LocationManager locationManager;
     private Location currentLocation;
-    private GeoPoint tphLocation;
-    private MyLocationNewOverlay myLocationOverlay;
-    private Marker tphMarker;
-    private Polygon geofenceCircle;
+    private double tphLatitude = 0.0;
+    private double tphLongitude = 0.0;
+    private boolean tphLocationSet = false;
 
     private static final String API_URL = "http://10.100.1.26:3005/api/TPH/GetItemByCompanyLocation?Company=A06&Location=21";
     private static final int PERMISSION_REQUEST_CODE = 1001;
-    private static final double GEOFENCE_RADIUS = 20.0; // 20 meters
+    private static final double GEOFENCE_RADIUS = 30.0; // 30 meters
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // IMPORTANT: Initialize osmdroid configuration BEFORE setContentView
-        Context ctx = getApplicationContext();
-
-        // Configure osmdroid properly
-        Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx));
-
-        // Set user agent - CRITICAL for OSM tile loading
-        Configuration.getInstance().setUserAgentValue(getPackageName());
-
-        // Enable debug mode to see what's happening
-        Configuration.getInstance().setDebugMode(true);
-
-        // Set cache path
-        Configuration.getInstance().setOsmdroidBasePath(ctx.getExternalFilesDir(null));
-        Configuration.getInstance().setOsmdroidTileCache(ctx.getExternalFilesDir("tiles"));
-
         setContentView(R.layout.activity_main);
 
         // Initialize views
@@ -104,9 +72,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         // Set click listeners
         setupClickListeners();
 
-        // Setup OpenStreetMap
-        setupOpenStreetMap();
-
         // Check permissions and setup UI
         checkPermissionsAndSetupUI();
     }
@@ -114,55 +79,17 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     private void initializeViews() {
         btnSync = findViewById(R.id.btnSync);
         btnShowAll = findViewById(R.id.btnShowAll);
-        btnShowOnMap = findViewById(R.id.btnShowOnMap);
         btnCheckGeofence = findViewById(R.id.btnCheckGeofence);
-        textResult = findViewById(R.id.textResult);
         progressContainer = findViewById(R.id.progressContainer);
         dropdownContainer = findViewById(R.id.dropdownContainer);
         geofenceStatusCard = findViewById(R.id.geofenceStatusCard);
-        mapContainer = findViewById(R.id.mapContainer);
         progressBar = findViewById(R.id.progressBar);
         progressText = findViewById(R.id.progressText);
         textGeofenceStatus = findViewById(R.id.textGeofenceStatus);
         textDistanceInfo = findViewById(R.id.textDistanceInfo);
+        textLocationInfo = findViewById(R.id.textLocationInfo);
         spinnerKodeBlok = findViewById(R.id.spinnerKodeBlok);
         spinnerTPH = findViewById(R.id.spinnerTPH);
-        osmMapView = findViewById(R.id.osmMapView);
-    }
-
-    private void setupOpenStreetMap() {
-        try {
-            // Set tile source - try MAPNIK first, fallback to others if needed
-            osmMapView.setTileSource(TileSourceFactory.MAPNIK);
-
-            // Enable multi-touch and zoom controls
-            osmMapView.setMultiTouchControls(true);
-            osmMapView.setBuiltInZoomControls(true);
-
-            // Enable hardware acceleration for better performance
-            osmMapView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-
-            // Set default view (Indonesia coordinates)
-            IMapController mapController = osmMapView.getController();
-            mapController.setZoom(15.0);
-            GeoPoint startPoint = new GeoPoint(-6.200000, 106.816666); // Jakarta as default
-            mapController.setCenter(startPoint);
-
-            // Add location overlay for current position
-            myLocationOverlay = new MyLocationNewOverlay(new GpsMyLocationProvider(this), osmMapView);
-            myLocationOverlay.enableMyLocation();
-            myLocationOverlay.enableFollowLocation();
-            osmMapView.getOverlays().add(myLocationOverlay);
-
-            // Force refresh
-            osmMapView.invalidate();
-
-            Log.d("OSM", "OpenStreetMap setup completed successfully");
-
-        } catch (Exception e) {
-            Log.e("OSM", "Error setting up OpenStreetMap", e);
-            Toast.makeText(this, "Error setting up map: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
     }
 
     private void setupSpinners() {
@@ -181,7 +108,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     private void setupClickListeners() {
         btnSync.setOnClickListener(v -> syncData());
         btnShowAll.setOnClickListener(v -> showAllData());
-        btnShowOnMap.setOnClickListener(v -> showSelectedLocationOnMap());
         btnCheckGeofence.setOnClickListener(v -> checkGeofenceStatus());
 
         // Spinner listeners
@@ -206,25 +132,24 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 boolean isSelected = position > 0;
-                btnShowOnMap.setEnabled(isSelected);
                 btnCheckGeofence.setEnabled(isSelected);
 
-                if (!isSelected) {
-                    hideMapAndGeofence();
+                if (isSelected) {
+                    loadSelectedTPHLocation();
+                } else {
+                    hideGeofenceStatus();
                 }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                btnShowOnMap.setEnabled(false);
                 btnCheckGeofence.setEnabled(false);
-                hideMapAndGeofence();
+                hideGeofenceStatus();
             }
         });
     }
 
     private void checkPermissionsAndSetupUI() {
-        // Check for location permissions
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
@@ -233,13 +158,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     PERMISSION_REQUEST_CODE);
         } else {
             startLocationUpdates();
-        }
-
-        // Also check for storage permissions for OSM caching
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    PERMISSION_REQUEST_CODE + 1);
         }
 
         checkDataAndSetupUI();
@@ -251,18 +169,29 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationUpdates();
-                myLocationOverlay.enableMyLocation();
-                Toast.makeText(this, "✅ Location permission granted", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "❌ Location permission required for geofencing", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Location permission required for geofencing", Toast.LENGTH_LONG).show();
             }
         }
     }
 
     private void startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 10, this);
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 10, this);
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 5, this);
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 5, this);
+
+            // Get last known location immediately
+            Location lastKnownGPS = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            Location lastKnownNetwork = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+
+            if (lastKnownGPS != null) {
+                currentLocation = lastKnownGPS;
+                updateLocationInfo();
+            } else if (lastKnownNetwork != null) {
+                currentLocation = lastKnownNetwork;
+                updateLocationInfo();
+            }
         }
     }
 
@@ -270,17 +199,27 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     @Override
     public void onLocationChanged(Location location) {
         currentLocation = location;
-        if (tphLocation != null) {
+        updateLocationInfo();
+
+        if (tphLocationSet) {
             updateDistanceInfo();
         }
+
+        Log.d("LOCATION", "New location: " + location.getLatitude() + ", " + location.getLongitude() +
+                " Accuracy: " + location.getAccuracy() + "m");
     }
 
     @Override
-    public void onProviderEnabled(String provider) {}
-    @Override
-    public void onProviderDisabled(String provider) {}
+    public void onProviderEnabled(String provider) {
+        Toast.makeText(this, "📡 " + provider + " enabled", Toast.LENGTH_SHORT).show();
+    }
 
-    private void showSelectedLocationOnMap() {
+    @Override
+    public void onProviderDisabled(String provider) {
+        Toast.makeText(this, "📵 " + provider + " disabled", Toast.LENGTH_SHORT).show();
+    }
+
+    private void loadSelectedTPHLocation() {
         int kodeBlokPos = spinnerKodeBlok.getSelectedItemPosition();
         int tphPos = spinnerTPH.getSelectedItemPosition();
 
@@ -298,173 +237,116 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     String[] coords = coordinate.split(",");
                     if (coords.length >= 2) {
                         try {
-                            double lat = Double.parseDouble(coords[0].trim());
-                            double lng = Double.parseDouble(coords[1].trim());
+                            tphLatitude = Double.parseDouble(coords[0].trim());
+                            tphLongitude = Double.parseDouble(coords[1].trim());
+                            tphLocationSet = true;
 
-                            tphLocation = new GeoPoint(lat, lng);
-                            showLocationOnMap(tphLocation, selectedKodeBlok, selectedTPH, company);
+                            Toast.makeText(this, "TPH location loaded successfully", Toast.LENGTH_SHORT).show();
 
                         } catch (NumberFormatException e) {
-                            Toast.makeText(this, "❌ Invalid coordinate format", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Invalid coordinate format", Toast.LENGTH_SHORT).show();
+                            tphLocationSet = false;
                         }
+                    } else {
+                        Toast.makeText(this, "Coordinate data incomplete", Toast.LENGTH_SHORT).show();
+                        tphLocationSet = false;
                     }
+                } else {
+                    Toast.makeText(this, "No coordinate data found", Toast.LENGTH_SHORT).show();
+                    tphLocationSet = false;
                 }
             }
             cursor.close();
         }
     }
 
-    private void showLocationOnMap(GeoPoint location, String kodeBlok, String tph, String company) {
-        try {
-            // Clear previous markers and overlays
-            if (tphMarker != null) {
-                osmMapView.getOverlays().remove(tphMarker);
-            }
-            if (geofenceCircle != null) {
-                osmMapView.getOverlays().remove(geofenceCircle);
-            }
-
-            // Add TPH marker
-            tphMarker = new Marker(osmMapView);
-            tphMarker.setPosition(location);
-            tphMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-            tphMarker.setTitle("TPH " + kodeBlok + "/" + tph);
-            tphMarker.setSubDescription("Company: " + company);
-
-            // Set marker icon (you can customize this)
-            try {
-                Drawable icon = ContextCompat.getDrawable(this, android.R.drawable.ic_menu_mylocation);
-                if (icon != null) {
-                    icon.setTint(ContextCompat.getColor(this, android.R.color.holo_red_dark));
-                    tphMarker.setIcon(icon);
-                }
-            } catch (Exception e) {
-                Log.e("MAP", "Error setting marker icon", e);
-            }
-
-            osmMapView.getOverlays().add(tphMarker);
-
-            // Create geofence circle (approximated as polygon)
-            geofenceCircle = new Polygon();
-            geofenceCircle.setPoints(createCirclePoints(location, GEOFENCE_RADIUS));
-            geofenceCircle.setFillColor(0x220000FF);
-            geofenceCircle.setStrokeColor(0x880000FF);
-            geofenceCircle.setStrokeWidth(3.0f);
-            osmMapView.getOverlays().add(geofenceCircle);
-
-            // Move camera to location
-            IMapController mapController = osmMapView.getController();
-            mapController.setZoom(18.0);
-            mapController.setCenter(location);
-
-            // Show map container
-            mapContainer.setVisibility(View.VISIBLE);
-
-            // Force refresh map
-            osmMapView.invalidate();
-
-            Log.d("MAP", "Location shown on map: " + location.getLatitude() + ", " + location.getLongitude());
-
-            textResult.setText("🗺️ Lokasi TPH ditampilkan di peta\n" +
-                    "📍 " + kodeBlok + "/" + tph + "\n" +
-                    "🎯 Radius geofence: " + GEOFENCE_RADIUS + " meter\n" +
-//                    "🆓 Menggunakan OpenStreetMap (Gratis!)\n\n" +
-                    "Klik 'Check Location' untuk validasi posisi Anda.");
-
-        } catch (Exception e) {
-            Log.e("MAP", "Error showing location on map", e);
-            Toast.makeText(this, "Error showing location: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    // Create circle points for polygon (approximating circle)
-    private List<GeoPoint> createCirclePoints(GeoPoint center, double radiusInMeters) {
-        List<GeoPoint> points = new ArrayList<>();
-        int sides = 32; // Number of sides for the polygon
-        double earthRadius = 6371000; // Earth's radius in meters
-
-        for (int i = 0; i <= sides; i++) {
-            double angle = 2.0 * Math.PI * i / sides;
-
-            double deltaLat = radiusInMeters * Math.cos(angle) / earthRadius;
-            double deltaLng = radiusInMeters * Math.sin(angle) / (earthRadius * Math.cos(Math.toRadians(center.getLatitude())));
-
-            double lat = center.getLatitude() + Math.toDegrees(deltaLat);
-            double lng = center.getLongitude() + Math.toDegrees(deltaLng);
-
-            points.add(new GeoPoint(lat, lng));
-        }
-
-        return points;
-    }
-
     private void checkGeofenceStatus() {
         if (currentLocation == null) {
-            Toast.makeText(this, "⏳ Menunggu lokasi GPS...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "⏳ Getting GPS location...", Toast.LENGTH_LONG).show();
             return;
         }
 
-        if (tphLocation == null) {
-            Toast.makeText(this, "❌ Pilih lokasi TPH terlebih dahulu", Toast.LENGTH_SHORT).show();
+        if (!tphLocationSet) {
+            Toast.makeText(this, "Please select TPH location first", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        double distance = tphLocation.distanceToAsDouble(new GeoPoint(currentLocation.getLatitude(), currentLocation.getLongitude()));
+        // Calculate distance using Haversine formula for better accuracy
+        double distance = calculateDistance(
+                currentLocation.getLatitude(), currentLocation.getLongitude(),
+                tphLatitude, tphLongitude
+        );
+
         boolean isWithinRange = distance <= GEOFENCE_RADIUS;
 
         // Show geofence status
         geofenceStatusCard.setVisibility(View.VISIBLE);
 
         if (isWithinRange) {
-            textGeofenceStatus.setText("✅ DALAM AREA GEOFENCE");
+            textGeofenceStatus.setText("INSIDE GEOFENCE AREA");
             textGeofenceStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-            textDistanceInfo.setText(String.format("📍 Jarak: %.1f meter (Dalam radius %.0f meter)",
+            textDistanceInfo.setText(String.format("📍 Distance: %.1f meters (Within %.0f m radius)",
                     distance, GEOFENCE_RADIUS));
         } else {
-            textGeofenceStatus.setText("❌ DILUAR AREA GEOFENCE");
+            textGeofenceStatus.setText("OUTSIDE GEOFENCE AREA");
             textGeofenceStatus.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
-            textDistanceInfo.setText(String.format("📍 Jarak: %.1f meter (Diluar radius %.0f meter)",
+            textDistanceInfo.setText(String.format("📍 Distance: %.1f meters (Outside %.0f m radius)",
                     distance, GEOFENCE_RADIUS));
         }
 
-        // Update result text
-        String status = isWithinRange ? "✅ VALID - Dalam area" : "❌ INVALID - Diluar area";
-        textResult.setText("🎯 HASIL VALIDASI GEOFENCE\n" +
-                "══════════════════════════\n\n" +
-                "Status: " + status + "\n" +
-                "Jarak dari TPH: " + String.format("%.1f meter", distance) + "\n" +
-                "Radius geofence: " + GEOFENCE_RADIUS + " meter\n" +
-//                "Map: OpenStreetMap (FREE) 🆓\n" +
-                "Waktu validasi: " + new java.util.Date().toString());
+        // Show validation result as toast
+        String status = isWithinRange ? "VALID - Inside area" : "INVALID - Outside area";
+        Toast.makeText(this, status + " (Distance: " + String.format("%.1f", distance) + "m)", Toast.LENGTH_LONG).show();
+    }
+
+    // Calculate distance using Haversine formula (more accurate than simple lat/lng calculation)
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371000; // Earth's radius in meters
+
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
+    private void updateLocationInfo() {
+        if (currentLocation != null && textLocationInfo != null) {
+            textLocationInfo.setText(String.format(
+                    "📍 Current: %.6f, %.6f (±%.0fm)",
+                    currentLocation.getLatitude(),
+                    currentLocation.getLongitude(),
+                    currentLocation.getAccuracy()
+            ));
+        }
     }
 
     private void updateDistanceInfo() {
-        if (currentLocation == null || tphLocation == null) return;
+        if (currentLocation == null || !tphLocationSet) return;
 
-        double distance = tphLocation.distanceToAsDouble(new GeoPoint(currentLocation.getLatitude(), currentLocation.getLongitude()));
+        double distance = calculateDistance(
+                currentLocation.getLatitude(), currentLocation.getLongitude(),
+                tphLatitude, tphLongitude
+        );
         boolean isWithinRange = distance <= GEOFENCE_RADIUS;
 
         if (geofenceStatusCard.getVisibility() == View.VISIBLE) {
-            textDistanceInfo.setText(String.format("📍 Jarak: %.1f meter %s",
+            textDistanceInfo.setText(String.format("📍 Distance: %.1f meters %s",
                     distance,
-                    isWithinRange ? "(Dalam area)" : "(Diluar area)"));
+                    isWithinRange ? "(Inside area)" : "(Outside area)"));
         }
     }
 
-    private void hideMapAndGeofence() {
-        mapContainer.setVisibility(View.GONE);
+    private void hideGeofenceStatus() {
         geofenceStatusCard.setVisibility(View.GONE);
-        if (tphMarker != null) {
-            osmMapView.getOverlays().remove(tphMarker);
-        }
-        if (geofenceCircle != null) {
-            osmMapView.getOverlays().remove(geofenceCircle);
-        }
-        osmMapView.invalidate();
-        tphLocation = null;
+        tphLocationSet = false;
+        tphLatitude = 0.0;
+        tphLongitude = 0.0;
     }
 
-    // Rest of your existing methods remain the same...
     private void syncData() {
         showProgress(true);
         setButtonsEnabled(false);
@@ -521,9 +403,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                     showProgress(false);
                     setButtonsEnabled(true);
                     loadKodeBlokData();
-                    textResult.setText("✅ Sync berhasil!\nTotal data: " + totalRecords + " records\n" +
-                            "📍 Pilih Kode Blok dan TPH untuk melihat lokasi di peta.\n" );
-//                            "🆓 Menggunakan OpenStreetMap - GRATIS!");
+                    Toast.makeText(MainActivity.this, "Sync successful! " + totalRecords + " records loaded", Toast.LENGTH_LONG).show();
                 });
 
             } catch (Exception e) {
@@ -531,7 +411,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                 runOnUiThread(() -> {
                     showProgress(false);
                     setButtonsEnabled(true);
-                    textResult.setText("❌ Sync gagal!\nError: " + e.getMessage());
+                    Toast.makeText(MainActivity.this, "Sync failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
             }
         }).start();
@@ -542,18 +422,18 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
             dropdownContainer.setVisibility(View.VISIBLE);
             btnShowAll.setVisibility(View.VISIBLE);
             loadKodeBlokData();
-            textResult.setText("📍 Data tersedia!\nPilih Kode Blok dan TPH untuk melihat lokasi di peta.");
+            Toast.makeText(this, "📍 Data available! Select Kode Blok and TPH", Toast.LENGTH_SHORT).show();
         } else {
             dropdownContainer.setVisibility(View.GONE);
             btnShowAll.setVisibility(View.GONE);
-            hideMapAndGeofence();
-            textResult.setText("Belum ada data.\nSilakan klik 'Sync Data' untuk memuat data dari server.");
+            hideGeofenceStatus();
+            Toast.makeText(this, "No data available. Please sync data first", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void loadKodeBlokData() {
         kodeBlokList.clear();
-        kodeBlokList.add("-- Pilih Kode Blok --");
+        kodeBlokList.add("-- Select Kode Blok --");
 
         Cursor cursor = dbHelper.getDistinctKodeBlok();
         if (cursor.moveToFirst()) {
@@ -572,7 +452,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
 
     private void loadTPHData(String kodeBlok) {
         tphList.clear();
-        tphList.add("-- Pilih No TPH --");
+        tphList.add("-- Select No TPH --");
 
         Cursor cursor = dbHelper.getTPHByKodeBlok(kodeBlok);
         if (cursor.moveToFirst()) {
@@ -587,18 +467,16 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
 
         tphAdapter.notifyDataSetChanged();
         spinnerTPH.setEnabled(true);
-        btnShowOnMap.setEnabled(false);
         btnCheckGeofence.setEnabled(false);
     }
 
     private void clearTPHSpinner() {
         tphList.clear();
-        tphList.add("-- Pilih Kode Blok terlebih dahulu --");
+        tphList.add("-- Select Kode Blok first --");
         tphAdapter.notifyDataSetChanged();
         spinnerTPH.setEnabled(false);
-        btnShowOnMap.setEnabled(false);
         btnCheckGeofence.setEnabled(false);
-        hideMapAndGeofence();
+        hideGeofenceStatus();
     }
 
     private void showAllData() {
@@ -607,7 +485,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         int count = 0;
 
         if (cursor.moveToFirst()) {
-            sb.append("📊 SEMUA DATA TPH\n═══════════════════\n\n");
+            sb.append("📊 ALL TPH DATA\n═══════════════\n\n");
 
             do {
                 String company = cursor.getString(cursor.getColumnIndexOrThrow("company"));
@@ -625,8 +503,8 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
                 sb.append("Coordinate: ").append(coordinate).append("\n");
                 sb.append("─────────────────\n\n");
 
-                if (count >= 50) {
-                    sb.append("... dan ").append(cursor.getCount() - 50).append(" data lainnya\n\n");
+                if (count >= 20) {
+                    sb.append("... and ").append(cursor.getCount() - 20).append(" more records\n\n");
                     break;
                 }
             } while (cursor.moveToNext());
@@ -635,7 +513,13 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
         }
 
         cursor.close();
-        textResult.setText(sb.toString());
+
+        // Show data in alert dialog instead of textResult
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("All TPH Data")
+                .setMessage(sb.toString())
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private void showProgress(boolean show) {
@@ -648,27 +532,12 @@ public class MainActivity extends AppCompatActivity implements LocationListener 
     private void setButtonsEnabled(boolean enabled) {
         btnSync.setEnabled(enabled);
         btnShowAll.setEnabled(enabled);
-        btnShowOnMap.setEnabled(enabled && spinnerTPH.getSelectedItemPosition() > 0);
         btnCheckGeofence.setEnabled(enabled && spinnerTPH.getSelectedItemPosition() > 0);
-    }
-
-    // MapView lifecycle methods
-    @Override
-    protected void onResume() {
-        super.onResume();
-        osmMapView.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        osmMapView.onPause();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        osmMapView.onDetach();
         if (locationManager != null) {
             locationManager.removeUpdates(this);
         }

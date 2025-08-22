@@ -8,7 +8,9 @@
         android:id="@+id/btnSync"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Sync Data" />
+        android:text="Sync Data"
+        android:textSize="16sp"
+        android:padding="12dp" />
 
     <!-- Progress Indicator Container -->
     <LinearLayout
@@ -37,6 +39,32 @@
 
     </LinearLayout>
 
+    <!-- Current Location Info -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        android:padding="12dp"
+        android:layout_marginTop="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📍 Current Location Status"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/textLocationInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📍 Getting location..."
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
     <!-- Dropdown Container -->
     <LinearLayout
         android:id="@+id/dropdownContainer"
@@ -49,7 +77,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📍 Pilih Lokasi TPH"
+            android:text="🎯 Select TPH Location"
             android:textSize="16sp"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
@@ -85,31 +113,16 @@
             android:background="@android:drawable/btn_dropdown"
             android:enabled="false" />
 
-        <!-- Action Buttons -->
-        <LinearLayout
+        <!-- Geofence Check Button -->
+        <Button
+            android:id="@+id/btnCheckGeofence"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/btnShowOnMap"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Show on Map"
-                android:enabled="false"
-                android:layout_marginEnd="8dp" />
-
-            <Button
-                android:id="@+id/btnCheckGeofence"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Check Location"
-                android:enabled="false" />
-
-        </LinearLayout>
+            android:text="🎯 Check Geofence Location"
+            android:enabled="false"
+            android:textSize="16sp"
+            android:padding="12dp"
+            android:background="@android:drawable/btn_default" />
 
     </LinearLayout>
 
@@ -130,8 +143,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="🎯 Geofence Status"
-            android:textSize="16sp"
+            android:textSize="18sp"
             android:textStyle="bold"
+            android:gravity="center"
             android:layout_marginBottom="8dp" />
 
         <TextView
@@ -139,35 +153,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Distance: Calculating..."
-            android:textSize="14sp" />
-
-    </LinearLayout>
-
-    <!-- Map Container with OpenStreetMap -->
-    <LinearLayout
-        android:id="@+id/mapContainer"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:orientation="vertical"
-        android:background="@android:drawable/dialog_holo_light_frame"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🗺️ TPH Location Map (OpenStreetMap)"
             android:textSize="14sp"
-            android:textStyle="bold"
-            android:padding="8dp"
-            android:background="@android:color/darker_gray"
-            android:textColor="@android:color/white" />
-
-        <!-- OpenStreetMap MapView -->
-        <org.osmdroid.views.MapView
-            android:id="@+id/osmMapView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clickable="true" />
+            android:gravity="center" />
 
     </LinearLayout>
 
@@ -176,26 +163,11 @@
         android:id="@+id/btnShowAll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Show All Data"
+        android:text="📊 Show All Data"
         android:layout_marginTop="8dp"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:textSize="14sp" />
 
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="16dp">
 
-        <TextView
-            android:id="@+id/textResult"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="10dp"
-            android:text="Silakan klik 'Sync Data' untuk memuat data"
-            android:gravity="start"
-            android:textSize="14sp"
-            android:background="@android:drawable/edit_text" />
-
-    </ScrollView>
 
 </LinearLayout>
